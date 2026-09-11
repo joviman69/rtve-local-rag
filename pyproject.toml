@@ -32,3 +32,6 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rtve_rag"]
