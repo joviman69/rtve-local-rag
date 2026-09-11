@@ -1,0 +1,1 @@
+{"id": "placeholder-001", "question": "Sustituir por una pregunta evaluable cuando exista corpus indexado.", "expected_document_ids": [], "filters": {}, "notes": "No usar este caso para métricas de producción."}
