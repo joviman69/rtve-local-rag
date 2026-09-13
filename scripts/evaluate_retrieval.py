@@ -11,7 +11,7 @@ from rtve_rag.settings import get_settings
 
 def unit_interval(value: str) -> float:
     number = float(value)
-    if not 0 <= number <= 1: raise argparse.ArgumentTypeError('El umbral debe estar between 0 and 1.')
+    if not 0 <= number <= 1: raise argparse.ArgumentTypeError('El umbral debe estar entre 0 y 1.')
     return number
 
 def main() -> None:
