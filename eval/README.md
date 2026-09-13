@@ -1,34 +1,25 @@
 # Evaluación RAG
 
-`questions.jsonl` es el conjunto de evaluación versionado. Añade una línea JSON por pregunta con esta estructura:
+`questions.jsonl` contiene una línea JSON por pregunta.
 
 ```json
-{"id":"eval-001","question":"Pregunta verificable","program":null,"emission_date":null,"expected_chunk_ids":["rtve_..."],"notes":"Criterio de relevancia"}
+{"id":"eval-001","question":"Pregunta verificable","program":null,"emission_date":null,"expected_evidence":true,"expected_chunk_ids":["rtve_..."],"notes":"Criterio de relevancia"}
 ```
 
-## Criterios
+Para un caso negativo, usa `expected_evidence:false` y una lista vacía de chunks. Un negativo aprueba solo si retrieval no devuelve resultados; esto mide abstención del retrieval, no la calidad de la respuesta del LLM.
 
-- Usa preguntas con respuesta verificable en el corpus.
-- Indica `expected_chunk_ids` cuando se conozcan los fragmentos que deben recuperarse.
-- Conserva filtros de programa y fecha cuando la pregunta los requiera.
-- Separa el conjunto de evaluación de los documentos indexados; no lo uses como datos de ingestión.
+## Crear casos
+
+```bash
+python scripts/build_eval_cases.py --questions eval/candidate_questions.txt --output eval/questions.jsonl --top-k 4
+```
+
+Pulsa Enter en la selección de fuentes para guardar un caso negativo.
 
 ## Ejecutar
 
-Con Qdrant y el modelo de embeddings disponibles, ejecuta:
-
 ```bash
-python scripts/evaluate_retrieval.py --input eval/questions.jsonl --output eval/report.json --top-k 4
+python scripts/evaluate_retrieval.py --input eval/questions.jsonl --output eval/report.json --top-k 4 --min-recall 0.80 --min-mrr 0.60 --min-negative-accuracy 0.80
 ```
 
-El proceso no llama al modelo de chat. El informe contiene `recall_at_k`, la fracción de preguntas cuyo chunk esperado aparece en los resultados, y `mrr`, que premia que el chunk esperado aparezca en posiciones más altas. También registra el modelo de embeddings, la colección, `top_k` y un timestamp UTC para comparar ejecuciones.
-
-## Umbrales para CI
-
-Los mínimos son opcionales. Si alguno no se cumple, el informe se escribe y el proceso termina con código 1:
-
-```bash
-python scripts/evaluate_retrieval.py --input eval/questions.jsonl --output eval/report.json --top-k 4 --min-recall 0.80 --min-mrr 0.60
-```
-
-`eval/report.json` es un artefacto local: no se versiona como fuente de verdad del conjunto de evaluación.
+Los casos positivos alimentan `recall_at_k` y `mrr`. Los negativos alimentan `negative_accuracy`. `total_accuracy` agrupa ambos tipos. El proceso escribe el informe y termina con código 1 si un umbral configurado no se cumple.
