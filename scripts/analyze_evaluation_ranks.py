@@ -2,8 +2,16 @@ import argparse
 import json
 from pathlib import Path
 
-def load_jsonl(path: Path) -> dict[str, dict]:
-    return {item['id']: item for line in path.read_text(encoding='utf-8').splitlines() if line.strip() for item in [json.loads(line)]}
+def load_jsonl(path: Path, key: str) -> dict[str, dict]:
+    items = {}
+    for line_number, line in enumerate(path.read_text(encoding='utf-8').splitlines(), start=1):
+        if not line.strip():
+            continue
+        item = json.loads(line)
+        if key not in item:
+            raise ValueError(f'Falta {key!r} en {path}, línea {line_number}.')
+        items[item[key]] = item
+    return items
 
 def show_chunk(label: str, chunk: dict | None, max_chars: int) -> None:
     if chunk is None:
@@ -27,8 +35,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.rank < 1:
         raise SystemExit('rank debe ser mayor que cero.')
-    cases = load_jsonl(Path(args.dataset))
-    chunks = load_jsonl(Path(args.chunks))
+    cases = load_jsonl(Path(args.dataset), 'id')
+    chunks = load_jsonl(Path(args.chunks), 'chunk_id')
     report = json.loads(Path(args.report).read_text(encoding='utf-8'))
     max_chars = 0 if args.full_text else args.max_chars
     matches = [score for score in report['cases'] if score.get('expected_evidence') and score.get('rank') == args.rank]
