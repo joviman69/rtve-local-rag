@@ -11,7 +11,7 @@ from rtve_rag.settings import get_settings
 
 def unit_interval(value: str) -> float:
     number = float(value)
-    if not 0 <= number <= 1: raise argparse.ArgumentTypeError('El umbral debe estar entre 0 y 1.')
+    if not 0 <= number <= 1: raise argparse.ArgumentTypeError('El umbral debe estar between 0 and 1.')
     return number
 
 def main() -> None:
@@ -25,6 +25,7 @@ def main() -> None:
         retrieval_query = normalize_query(case['question']) if args.normalize_query else case['question']
         results = search(case['question'], client, settings.qdrant_collection, settings.ollama_base_url, settings.ollama_embedding_model, args.top_k, case.get('program'), case.get('emission_date'), normalize=args.normalize_query)
         score = score_case(case, results)
+        score['question'] = case['question']
         score['retrieval_query'] = retrieval_query
         scored.append(score)
     report = {'generated_at': datetime.now(timezone.utc).isoformat(), 'input': args.input, 'top_k': args.top_k, 'query_normalization': args.normalize_query, 'embedding_model': settings.ollama_embedding_model, 'collection': settings.qdrant_collection, **summarize(scored)}
