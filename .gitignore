@@ -11,7 +11,7 @@ __pycache__/
 
 data/raw/*
 !data/raw/.gitkeep
-data/subtitles/*
+data/rag_documentos/*
 data/processed/*
 !data/processed/.gitkeep
 logs/
