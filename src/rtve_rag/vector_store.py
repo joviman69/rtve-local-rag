@@ -5,7 +5,7 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 
 def ensure_collection(client: QdrantClient, collection: str, dimension: int) -> None:
     if not client.collection_exists(collection):
-        client.create_collection(collection, vectors_config=VectorParams(size=dimension, distance=Distance.COSINE))
+        client.create_collection(collection_name=collection, vectors_config=VectorParams(size=dimension, distance=Distance.COSINE))
 
 def upsert_chunks(client: QdrantClient, collection: str, chunks: list[dict], vectors: list[list[float]]) -> None:
     if len(chunks) != len(vectors): raise ValueError("chunks y vectors deben tener la misma longitud")
