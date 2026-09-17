@@ -122,7 +122,7 @@ except ImportError:  # pragma: no cover
 # --------------------------------------------------------------------------- #
 
 APP_NAME = "rtve-subs"
-APP_VERSION = "1.5.0"
+APP_VERSION = "1.8.0"
 
 API_HOSTS: Tuple[str, ...] = ("https://api2.rtve.es", "https://api.rtve.es", "https://www.rtve.es")
 API_PROGRAM_VIDEOS = "{host}/api/programas/{program_id}/videos.json"
@@ -1133,7 +1133,7 @@ def build_parser() -> argparse.ArgumentParser:
                            help="Formato de salida. Def: srt")
 
     output = parser.add_argument_group("salida")
-    output.add_argument("--out", default="data/raw", help="Directorio raíz. Def: data/subtitles")
+    output.add_argument("--out", default="data/subtitles", help="Directorio raíz. Def: data/subtitles")
     output.add_argument("--log-dir", default="logs", help="Directorio de logs. Def: logs")
     output.add_argument("--manifest", default=None, help=f"Ruta del manifest. Def: <out>/{MANIFEST_NAME}")
     output.add_argument("--force", action="store_true", help="Redescargar aunque ya exista")
@@ -1302,93 +1302,113 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 
-# --------------------------------------------------------------------------- #
-# Salida RAG: texto limpio dividido por puntuación, una línea por fragmento
-# --------------------------------------------------------------------------- #
-
+# --- v1.8: fallback de sitemap para Telediario Fin de Semana ----------------
 import html as _clean_html
-
-_CLEAN_OUTPUT = {"root": None}
-_CLEAN_TIME_RE = re.compile(r"\d{1,2}:\d{2}(?::\d{2})?[,.]\d{1,3}\s*-->\s*\d{1,2}:\d{2}(?::\d{2})?[,.]\d{1,3}")
-
-
-def subtitle_to_clean_lines(source: str) -> List[str]:
-    """Extrae texto de SRT/VTT y separa por cierre de frase, sin timecodes."""
-    source = source.replace("\r\n", "\n").replace("\r", "\n").lstrip("\ufeff")
-    cues: List[str] = []
-    for block in re.split(r"\n[ \t]*\n", source):
-        lines = [line.strip() for line in block.split("\n") if line.strip()]
-        if not lines or lines[0].upper().startswith(("WEBVTT", "NOTE", "STYLE", "REGION")):
-            continue
-        timing_index = next((i for i, line in enumerate(lines) if "-->" in line), None)
-        if timing_index is None or not _CLEAN_TIME_RE.search(lines[timing_index]):
-            continue
-        value = _clean_html.unescape(" ".join(lines[timing_index + 1:]))
-        value = re.sub(r"<[^>]+>", "", value)
-        value = re.sub(r"\{\\[^}]*\}", "", value)
-        value = re.sub(r"\s+", " ", value.replace("\u200b", " ")).strip()
-        if value and (not cues or value.casefold() != cues[-1].casefold()):
-            cues.append(value)
-
-    full_text = re.sub(r"\s+", " ", " ".join(cues)).strip()
-    # La puntuación fuerte crea el salto de línea; el resto queda en la frase.
-    return [fragment.strip() for fragment in re.split(r"(?<=[.!?…])\s+", full_text) if fragment.strip()]
+import xml.etree.ElementTree as _ET
+_CFG={"edition":15,"clean_out":None,"sitemap_max":40}
+_TIME=re.compile(r"\d{1,2}:\d{2}(?::\d{2})?[,.]\d{1,3}\s*-->\s*\d{1,2}:\d{2}(?::\d{2})?[,.]\d{1,3}")
 
 
-def write_clean_text_file(subtitle_path: Path, out_dir: Path) -> Path:
-    """Crea un TXT sin cabeceras, etiquetas, timecodes ni líneas en blanco."""
-    raw = subtitle_path.read_text(encoding="utf-8-sig")
-    lines = subtitle_to_clean_lines(raw)
-    if not lines:
-        raise ValueError("No se pudo extraer texto de %s" % subtitle_path)
-    try:
-        relative = subtitle_path.relative_to(out_dir)
-    except ValueError:
-        relative = Path(subtitle_path.name)
-    root = Path(_CLEAN_OUTPUT["root"]).expanduser().resolve() if _CLEAN_OUTPUT["root"] else out_dir.parent / "clean"
-    destination = root / relative.with_suffix(".txt")
-    atomic_write_text(destination, "\n".join(lines) + "\n")
-    return destination
+def matches_edition(item: VideoItem, edition: Optional[int]) -> bool:
+    if edition is None: return True
+    return bool(re.search(r"\b%s\s*horas\b" % edition, (item.title or "").casefold())) or item.emitted_at.hour == edition
 
 
-_original_build_parser = build_parser
+def _sitemap_urls(http: RtveHttpClient, maximum: int) -> List[str]:
+    # Primero se intenta el índice; si RTVE no lo publica, se usan los ficheros numerados.
+    for index in ("https://www.rtve.es/sitemap.xml", "https://www.rtve.es/sitemaps/play/videos/sitemap.xml"):
+        try:
+            root=_ET.fromstring(http.request(index,expect="text"))
+            urls=[e.text.strip() for e in root.iter() if e.tag.endswith("loc") and e.text and "sitemaps-videos" in e.text]
+            if urls: return urls
+        except (RtveError, _ET.ParseError): pass
+    return ["https://www.rtve.es/sitemaps/play/videos/sitemaps-videos%d.xml" % n for n in range(1,maximum+1)]
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = _original_build_parser()
-    parser.add_argument(
-        "--clean-out", default=None,
-        help="Raíz de los TXT limpios. Def: directorio hermano <out>/../clean",
-    )
+
+def iter_weekend_sitemap_videos(api: RtveApi, slug: str, date_from: date, date_to: date) -> Iterator[VideoItem]:
+    seen=set(); prefix="https://www.rtve.es/play/videos/telediario-fin-de-semana/"
+    for sitemap in _sitemap_urls(api.http, int(_CFG["sitemap_max"])):
+        try: root=_ET.fromstring(api.http.request(sitemap,expect="text"))
+        except (RtveError, _ET.ParseError): continue
+        for node in root.iter():
+            if not node.tag.endswith("url"): continue
+            loc=next((x.text for x in node if x.tag.endswith("loc") and x.text), "")
+            modified=next((x.text for x in node if x.tag.endswith("lastmod") and x.text), "")
+            if not loc.startswith(prefix): continue
+            try: sitemap_day=datetime.fromisoformat(modified.replace("Z","+00:00")).date()
+            except ValueError: continue
+            if not date_from <= sitemap_day <= date_to: continue
+            video_id=extract_video_id(loc)
+            if not video_id or video_id in seen: continue
+            seen.add(video_id)
+            try: item=api.get_video(video_id,slug_hint=slug)
+            except RtveError:
+                # El sitemap sigue permitiendo descubrir y descargar la pista por ID.
+                item=VideoItem(video_id=video_id,title=loc.rsplit("/",2)[-2].replace("-"," "),emitted_at=datetime.combine(sitemap_day,datetime.min.time()),html_url=loc,program_slug=slug,is_full_episode=True)
+            if date_from <= item.day <= date_to: yield item
+
+
+_original_iter=RtveApi.iter_program_videos
+def _iter_with_weekend_fallback(self,program_id,slug,date_from,date_to,page_size=60,max_pages=200):
+    items=list(_original_iter(self,program_id,slug,date_from,date_to,page_size,max_pages))
+    if items or slug != "telediario-fin-de-semana":
+        yield from items; return
+    LOG.warning("El catálogo API de fin de semana está vacío; se usa el sitemap de RTVE")
+    yield from iter_weekend_sitemap_videos(self,slug,date_from,date_to)
+RtveApi.iter_program_videos=_iter_with_weekend_fallback
+
+
+def _clean_lines(raw: str) -> List[str]:
+    cues=[]
+    for block in re.split(r"\n[ \t]*\n",raw.replace("\r\n","\n").replace("\r","\n").lstrip("\ufeff")):
+        rows=[x.strip() for x in block.split("\n") if x.strip()]
+        i=next((n for n,x in enumerate(rows) if "-->" in x),None)
+        if i is None or not _TIME.search(rows[i]): continue
+        text=re.sub(r"<[^>]+>|\{\\[^}]*\}","",_clean_html.unescape(" ".join(rows[i+1:])))
+        text=re.sub(r"\s+"," ",text).strip()
+        if text and (not cues or text.casefold()!=cues[-1].casefold()): cues.append(text)
+    return [x.strip() for x in re.split(r"(?<=[.!?…])\s+"," ".join(cues)) if x.strip()]
+
+def _write_clean(path: Path, out: Path) -> Path:
+    lines=_clean_lines(path.read_text(encoding="utf-8-sig"))
+    if not lines: raise ValueError("sin texto interpretable")
+    root=Path(_CFG["clean_out"]).expanduser().resolve() if _CFG["clean_out"] else out.parent/"clean"
+    try: dest=root/path.relative_to(out).with_suffix(".txt")
+    except ValueError: dest=root/(path.stem+".txt")
+    atomic_write_text(dest,"\n".join(lines)+"\n"); return dest
+
+_original_download=SubtitleDownloader._download_track
+def _download_clean(self,item,lang,url):
+    _original_download(self,item,lang,url)
+    if self.dry_run: return
+    paths=[self.target_path(item,lang,f) for f in ("srt","vtt") if f in self.formats]
+    source=next((p for p in paths if p.exists() and p.stat().st_size>0),None)
+    if source:
+        try: LOG.info(" ✓ texto limpio: %s",_write_clean(source,self.out_dir))
+        except (OSError,UnicodeError,ValueError) as exc: LOG.error(" ✗ texto limpio %s: %s",source,exc)
+SubtitleDownloader._download_track=_download_clean
+
+_original_process=SubtitleDownloader.process
+def _process_edition(self,item):
+    if matches_edition(item,_CFG["edition"]): _original_process(self,item)
+    else: LOG.info("[%s] omitido por filtro de edición %s: %s",item.video_id,_CFG["edition"],item.title[:80])
+SubtitleDownloader.process=_process_edition
+
+_original_parser=build_parser
+def build_parser():
+    parser=_original_parser(); g=parser.add_argument_group("filtros y fallback")
+    g.add_argument("--edicion",type=int,choices=(15,21),default=15,help="Edición a descargar. Def: 15")
+    g.add_argument("--todas-las-ediciones",action="store_true",help="Desactiva el filtro de edición")
+    g.add_argument("--clean-out",default=None,help="Raíz de TXT limpios; def: <out>/../clean")
+    g.add_argument("--sitemap-max",type=int,default=40,help="Máximo de sitemaps numerados a explorar en fallback. Def: 40")
     return parser
 
-
-_original_download_track = SubtitleDownloader._download_track
-
-def _download_track_and_clean(self, item: VideoItem, lang: str, url: str) -> None:
-    _original_download_track(self, item, lang, url)
-    if self.dry_run:
-        return
-    # Con --formato both se prefiere el SRT; con VTT exclusivo también funciona.
-    candidates = [self.target_path(item, lang, fmt) for fmt in ("srt", "vtt") if fmt in self.formats]
-    subtitle_path = next((path for path in candidates if path.exists() and path.stat().st_size > 0), None)
-    if subtitle_path is None:
-        return
-    try:
-        clean_path = write_clean_text_file(subtitle_path, self.out_dir)
-        LOG.info(" ✓ texto limpio: %s", clean_path)
-    except (OSError, UnicodeError, ValueError) as exc:
-        LOG.error(" ✗ no se pudo crear el texto limpio de %s: %s", subtitle_path, exc)
-        self.stats.errors += 1
-
-
-SubtitleDownloader._download_track = _download_track_and_clean
-_original_main = main
-
-def main(argv: Optional[Sequence[str]] = None) -> int:
-    pre_parser = argparse.ArgumentParser(add_help=False)
-    pre_parser.add_argument("--clean-out", default=None)
-    pre_args, _ = pre_parser.parse_known_args(argv)
-    _CLEAN_OUTPUT["root"] = pre_args.clean_out
+_original_main=main
+def main(argv=None):
+    p=argparse.ArgumentParser(add_help=False); p.add_argument("--edicion",type=int,choices=(15,21),default=15); p.add_argument("--todas-las-ediciones",action="store_true"); p.add_argument("--clean-out"); p.add_argument("--sitemap-max",type=int,default=40)
+    a,_=p.parse_known_args(argv)
+    if a.sitemap_max<1: raise SystemExit("--sitemap-max debe ser >= 1")
+    _CFG.update(edition=None if a.todas_las_ediciones else a.edicion,clean_out=a.clean_out,sitemap_max=a.sitemap_max)
     return _original_main(argv)
 
 if __name__ == "__main__":
