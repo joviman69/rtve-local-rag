@@ -1,0 +1,24 @@
+{"id": "eval-neg-001", "question": "¿Cuál es la receta tradicional de croquetas de jamón?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": "[ID migrado desde eval-001.]"}
+{"id": "eval-neg-002", "question": "¿Qué resultado tuvo el último partido entre el Real Madrid y el Barcelona?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": "[ID migrado desde eval-002.]"}
+{"id": "eval-neg-003", "question": "¿Cuál es el precio actual del bitcoin?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": "[ID migrado desde eval-003.]"}
+{"id": "eval-neg-004", "question": "¿Cómo se puede renovar el DNI por Internet?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": "[ID migrado desde eval-004.]"}
+{"id": "eval-neg-005", "question": "¿Qué previsión meteorológica habrá mañana en Londres?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": "[ID migrado desde eval-005.]"}
+{"id": "eval-neg-006", "question": "¿Qué películas están nominadas a los Óscar de 2027?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": "[ID migrado desde eval-006.]"}
+{"id": "eval-neg-007", "question": "¿Quién ganó el último torneo de tenis de Wimbledon?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": "[ID migrado desde eval-007.]"}
+{"id": "eval-neg-008", "question": "¿Cuál es la capital de Australia?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": "[ID migrado desde eval-008.]"}
+{"id": "eval-neg-009", "question": "¿Cuál es la receta tradicional de tortilla de patatas?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": ""}
+{"id": "eval-neg-010", "question": "¿Cómo puedo renovar el carnet de conducir por Internet?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": ""}
+{"id": "eval-neg-011", "question": "¿Cuál es el precio actual del oro?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": ""}
+{"id": "eval-neg-012", "question": "¿Qué previsión meteorológica habrá mañana en Paris?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": ""}
+{"id": "eval-neg-013", "question": "¿Qué películas están nominadas a los Óscar de 2028?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": ""}
+{"id": "eval-neg-014", "question": "¿Quién ganó el último torneo de ajedrez de Linares?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": ""}
+{"id": "eval-neg-015", "question": "¿Cuál es la capital de Mozambique?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": ""}
+{"id": "eval-neg-016", "question": "¿Cuál fue el resultado del último partido entre el Real Madrid y el Zaragoza?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": ""}
+{"id": "eval-neg-017", "question": "¿Cuántos habitantes tiene la ciudad de Tokio?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": ""}
+{"id": "eval-neg-018", "question": "¿Cómo se solicita una beca Erasmus?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": ""}
+{"id": "eval-neg-019", "question": "¿Qué compañía fabrica el iPhone?", "program": null, "emission_date": null, "expected_evidence": true, "expected_chunk_ids": ["rtve_telediario-1_2026-09-01_1500_es_0033_673abab8542b"], "notes": ""}
+{"id": "eval-neg-020", "question": "¿En qué año nació Francesc Garrido?", "program": null, "emission_date": null, "expected_evidence": true, "expected_chunk_ids": ["rtve_telediario-1_2026-09-01_1500_es_0046_024e9ab0a6e5"], "notes": ""}
+{"id": "eval-neg-021", "question": "¿Cuál es la capital de Nepal?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": ""}
+{"id": "eval-neg-022", "question": "¿Qué idioma se habla en Noruega?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": ""}
+{"id": "eval-neg-023", "question": "¿Cuál es la anchura del estrecho de Ormuz?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": ""}
+{"id": "eval-neg-024", "question": "¿Dónde está la sede central de RTVE?", "program": null, "emission_date": null, "expected_evidence": false, "expected_chunk_ids": [], "notes": ""}
