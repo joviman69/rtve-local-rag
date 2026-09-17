@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RTVE Local RAG</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b1020; --panel:#151c32; --line:#2c375a; --text:#eef2ff; --muted:#aeb9d6; --accent:#8ab4ff; --ok:#41c98e; --warn:#f0b35c; --danger:#ff8181; }
+    * { box-sizing:border-box; } body { margin:0; background:linear-gradient(135deg,#0b1020,#101a34); color:var(--text); font:16px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(980px,calc(100% - 32px)); margin:0 auto; padding:48px 0 72px; } h1 { margin:0; font-size:clamp(2rem,5vw,3.25rem); } h2 { margin:0 0 12px; font-size:1.2rem; } .lead { color:var(--muted); margin:8px 0 32px; } .panel { background:rgba(21,28,50,.94); border:1px solid var(--line); border-radius:16px; padding:24px; box-shadow:0 16px 40px rgba(0,0,0,.2); } label { display:block; font-weight:650; margin-bottom:7px; } textarea,input { width:100%; border:1px solid var(--line); border-radius:9px; background:#0d1428; color:var(--text); padding:11px; font:inherit; } textarea { min-height:112px; resize:vertical; } .options { display:grid; grid-template-columns:110px 1fr 1fr; gap:14px; margin:16px 0; } button { border:0; border-radius:9px; background:var(--accent); color:#071226; cursor:pointer; font-weight:750; padding:12px 18px; font:inherit; } button:hover { filter:brightness(1.08); } button:disabled { cursor:wait; opacity:.65; } #result { margin-top:24px; } [hidden] { display:none !important; } .status { border-radius:10px; padding:12px 14px; margin-bottom:16px; } .supported { background:#113d31; border:1px solid #237456; color:#c7f5df; } .insufficient { background:#49391d; border:1px solid #92712e; color:#ffe9b8; } .error { background:#4a2026; border:1px solid #9b414d; color:#ffd9dc; } .answer { white-space:pre-wrap; font-size:1.06rem; } .reason { color:var(--muted); margin:14px 0 0; } .sources { margin-top:24px; display:grid; gap:12px; } .source { border-left:4px solid var(--accent); background:#0d1428; border-radius:8px; padding:14px; } .source-header { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; } .source-number { color:var(--accent); font-weight:800; } .metadata { color:var(--muted); font-size:.9rem; } .excerpt { margin:10px 0 0; } code { overflow-wrap:anywhere; color:#c8d7ff; } @media (max-width:700px) { main { width:min(100% - 24px,980px); padding-top:28px; } .panel { padding:18px; } .options { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>RTVE Local RAG</h1>
+      <p class="lead">Consulta informativos indexados con respuestas verificadas y fuentes trazables.</p>
+    </header>
+    <section class="panel" aria-label="Consulta">
+      <form id="ask-form">
+        <label for="question">Pregunta</label>
+        <textarea id="question" name="question" required placeholder="Ej.: ¿Qué información hay disponible sobre Nepal?"></textarea>
+        <div class="options">
+          <div><label for="top-k">Fuentes</label><input id="top-k" name="top_k" type="number" min="1" max="12" value="4"></div>
+          <div><label for="program">Programa (opcional)</label><input id="program" name="program" placeholder="telediario-1"></div>
+          <div><label for="emission-date">Fecha (opcional)</label><input id="emission-date" name="emission_date" type="date"></div>
+        </div>
+        <button id="submit" type="submit">Consultar corpus</button>
+      </form>
+    </section>
+    <section id="result" aria-live="polite" hidden>
+      <div id="status" class="status"></div>
+      <article class="panel">
+        <h2>Respuesta</h2>
+        <div id="answer" class="answer"></div>
+        <p id="reason" class="reason"></p>
+        <div id="sources-wrap" class="sources" hidden>
+          <h2>Fuentes verificadas</h2>
+          <div id="sources"></div>
+        </div>
+      </article>
+    </section>
+  </main>
+  <script>
+    const form = document.querySelector('#ask-form');
+    const submit = document.querySelector('#submit');
+    const result = document.querySelector('#result');
+    const status = document.querySelector('#status');
+    const answer = document.querySelector('#answer');
+    const reason = document.querySelector('#reason');
+    const sourcesWrap = document.querySelector('#sources-wrap');
+    const sources = document.querySelector('#sources');
+
+    function element(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    function renderSources(items) {
+      sources.replaceChildren();
+      if (!items.length) { sourcesWrap.hidden = true; return; }
+      sourcesWrap.hidden = false;
+      for (const source of items) {
+        const card = element('article', 'source');
+        const header = element('div', 'source-header');
+        header.append(element('span', 'source-number', `[${source.source_number}]`));
+        header.append(element('strong', '', source.program || 'RTVE'));
+        header.append(element('span', 'metadata', source.emission_date || 'Sin fecha'));
+        if (source.score !== null && source.score !== undefined) header.append(element('span', 'metadata', `score ${Number(source.score).toFixed(3)}`));
+        card.append(header);
+        card.append(element('p', 'excerpt', source.excerpt || 'Sin extracto disponible.'));
+        const chunk = element('code', '', source.chunk_id || 'sin chunk');
+        card.append(chunk);
+        sources.append(card);
+      }
+    }
+
+    function showStatus(kind, message) {
+      status.className = `status ${kind}`;
+      status.textContent = message;
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const question = document.querySelector('#question').value.trim();
+      if (!question) return;
+      const payload = { question, top_k: Number(document.querySelector('#top-k').value) || 4 };
+      const program = document.querySelector('#program').value.trim();
+      const emissionDate = document.querySelector('#emission-date').value;
+      if (program) payload.program = program;
+      if (emissionDate) payload.emission_date = emissionDate;
+      submit.disabled = true;
+      submit.textContent = 'Consultando…';
+      result.hidden = false;
+      answer.textContent = '';
+      reason.textContent = '';
+      renderSources([]);
+      showStatus('insufficient', 'Buscando evidencia en el corpus…');
+      try {
+        const response = await fetch('/ask', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || `Error HTTP ${response.status}`);
+        const supported = data.has_direct_evidence === true;
+        showStatus(supported ? 'supported' : 'insufficient', supported ? 'Respuesta sustentada por evidencia verificada.' : 'Evidencia insuficiente para responder.');
+        answer.textContent = data.answer || '';
+        reason.textContent = data.verification_reason ? `Verificación: ${data.verification_reason}` : '';
+        renderSources(supported ? (data.sources || []) : []);
+      } catch (error) {
+        showStatus('error', 'No se ha podido completar la consulta.');
+        answer.textContent = error.message || String(error);
+      } finally {
+        submit.disabled = false;
+        submit.textContent = 'Consultar corpus';
+      }
+    });
+  </script>
+</body>
+</html>

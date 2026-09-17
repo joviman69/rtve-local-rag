@@ -4,7 +4,7 @@ Asistente RAG local y fundamentado en evidencia para consultar subtítulos de in
 
 ## Estado
 
-El proyecto incluye ingesta, normalización temporal, chunking, indexación idempotente, recuperación semántica, generación con citas, verificación de evidencia, evaluación y despliegue local mediante Docker.
+El proyecto incluye ingesta, normalización temporal, chunking, indexación idempotente, recuperación semántica, generación con citas, verificación de evidencia, evaluación, interfaz web local y despliegue mediante Docker.
 
 La API no responde con conocimiento externo: solo genera una respuesta cuando el verificador encuentra evidencia material en los chunks recuperados. En caso contrario devuelve una abstención explícita.
 
@@ -15,6 +15,18 @@ cp .env.example .env
 docker compose up --build
 curl http://localhost:8000/health
 ```
+
+## Interfaz web
+
+Abre [http://localhost:8000/](http://localhost:8000/) en el navegador después de iniciar el servicio. La interfaz se sirve desde FastAPI y no depende de CDNs ni de servicios externos.
+
+Permite:
+
+- Formular preguntas al corpus indexado.
+- Limitar la búsqueda por programa o fecha de emisión.
+- Elegir entre una y doce fuentes candidatas.
+- Distinguir visualmente respuestas sustentadas de abstenciones por evidencia insuficiente.
+- Consultar programa, fecha, score, extracto y `chunk_id` de cada fuente verificada.
 
 ## API
 

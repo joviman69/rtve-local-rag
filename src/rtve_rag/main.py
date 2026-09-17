@@ -1,6 +1,9 @@
 import time
 import uuid
+from pathlib import Path
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from qdrant_client import QdrantClient
 from rtve_rag.citations import build_source_records, format_sources
@@ -10,7 +13,9 @@ from rtve_rag.observability import log_event
 from rtve_rag.retrieval import search
 from rtve_rag.settings import get_settings
 
-app = FastAPI(title="RTVE Local RAG", version="0.4.0")
+app = FastAPI(title="RTVE Local RAG", version="0.5.0")
+STATIC_DIR = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 class AskRequest(BaseModel):
@@ -33,6 +38,11 @@ class AskResponse(BaseModel):
 INSUFFICIENT_EVIDENCE_ANSWER = (
     "No encuentro evidencia suficiente en el corpus indexado para responder a esta pregunta."
 )
+
+
+@app.get("/", include_in_schema=False)
+def web_interface():
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/health")
@@ -66,53 +76,32 @@ def ask(request: AskRequest) -> AskResponse:
 
         if not results:
             log_event(
-                "ask_completed",
-                request_id=request_id,
-                retrieval_ms=retrieval_ms,
-                total_ms=round((time.perf_counter() - started) * 1000),
-                source_count=0,
-                evidence="insufficient",
-                reason="no_retrieval_candidates",
+                "ask_completed", request_id=request_id, retrieval_ms=retrieval_ms,
+                total_ms=round((time.perf_counter() - started) * 1000), source_count=0,
+                evidence="insufficient", reason="no_retrieval_candidates",
             )
             return AskResponse(
-                request_id=request_id,
-                answer=INSUFFICIENT_EVIDENCE_ANSWER,
-                has_direct_evidence=False,
-                confidence="insufficient_evidence",
-                verification_reason="no_retrieval_candidates",
-                sources=[],
-                citations=[],
+                request_id=request_id, answer=INSUFFICIENT_EVIDENCE_ANSWER,
+                has_direct_evidence=False, confidence="insufficient_evidence",
+                verification_reason="no_retrieval_candidates", sources=[], citations=[],
             )
 
         verification = verify_evidence(
-            request.question,
-            results,
-            settings.ollama_base_url,
-            settings.ollama_chat_model,
+            request.question, results, settings.ollama_base_url, settings.ollama_chat_model,
         )
         relevant_ids = set(verification["relevant_chunk_ids"])
-        evidence_results = [
-            item for item in results if item.get("chunk_id") in relevant_ids
-        ]
+        evidence_results = [item for item in results if item.get("chunk_id") in relevant_ids]
 
         if not verification["has_direct_evidence"] or not evidence_results:
             log_event(
-                "ask_completed",
-                request_id=request_id,
-                retrieval_ms=retrieval_ms,
-                total_ms=round((time.perf_counter() - started) * 1000),
-                source_count=0,
-                evidence="insufficient",
-                reason=verification["reason"],
+                "ask_completed", request_id=request_id, retrieval_ms=retrieval_ms,
+                total_ms=round((time.perf_counter() - started) * 1000), source_count=0,
+                evidence="insufficient", reason=verification["reason"],
             )
             return AskResponse(
-                request_id=request_id,
-                answer=INSUFFICIENT_EVIDENCE_ANSWER,
-                has_direct_evidence=False,
-                confidence="insufficient_evidence",
-                verification_reason=verification["reason"],
-                sources=[],
-                citations=[],
+                request_id=request_id, answer=INSUFFICIENT_EVIDENCE_ANSWER,
+                has_direct_evidence=False, confidence="insufficient_evidence",
+                verification_reason=verification["reason"], sources=[], citations=[],
             )
 
         citations = format_sources(evidence_results)
@@ -125,32 +114,22 @@ def ask(request: AskRequest) -> AskResponse:
             "Cita toda afirmación factual con los marcadores [n] disponibles. "
             "Si el contexto no permite responder, dilo claramente.\n"
             f"Contexto:\n{context}\n\nPregunta: {request.question}",
-            settings.ollama_base_url,
-            settings.ollama_chat_model,
+            settings.ollama_base_url, settings.ollama_chat_model,
         )
         sources = build_source_records(evidence_results)
         log_event(
-            "ask_completed",
-            request_id=request_id,
-            retrieval_ms=retrieval_ms,
-            total_ms=round((time.perf_counter() - started) * 1000),
-            source_count=len(sources),
-            evidence="grounded",
-            reason=verification["reason"],
+            "ask_completed", request_id=request_id, retrieval_ms=retrieval_ms,
+            total_ms=round((time.perf_counter() - started) * 1000), source_count=len(sources),
+            evidence="grounded", reason=verification["reason"],
         )
         return AskResponse(
-            request_id=request_id,
-            answer=answer,
-            has_direct_evidence=True,
-            confidence="supported",
-            verification_reason=verification["reason"],
-            sources=sources,
-            citations=citations,
+            request_id=request_id, answer=answer, has_direct_evidence=True,
+            confidence="supported", verification_reason=verification["reason"],
+            sources=sources, citations=citations,
         )
     except Exception as error:
         log_event(
-            "ask_failed",
-            request_id=request_id,
+            "ask_failed", request_id=request_id,
             total_ms=round((time.perf_counter() - started) * 1000),
             error_type=type(error).__name__,
         )
