@@ -21,6 +21,9 @@ Reglas:
 - Para preguntas amplias como "qué información hay", "actualidad" o "últimas noticias", basta con uno o más hechos sustantivos y relevantes sobre la entidad. No exijas una biografía, una cobertura exhaustiva ni varios asuntos independientes.
 - Para tendencias o evolución, expresiones como "sube", "baja", "continúa", "se mantiene", "récord" y comparaciones temporales son evidencia directa cuando responden a la pregunta.
 - Para expresiones temporales como "reciente", "hoy", "ayer" o "últimos tiempos", usa FECHA_DE_EMISIÓN como referencia documental. No rechaces una noticia pertinente solo porque el texto no repita literalmente "reciente".
+- Comprueba todos los elementos específicos de la pregunta antes de aceptar evidencia. Si pregunta por una ubicación, país, ciudad, persona, organización, fecha, año, cifra, relación o evento concreto, el contexto debe mencionarlo explícitamente o permitir resolverlo sin ambigüedad con los metadatos proporcionados.
+- No aceptes información de otra ubicación como respuesta. Por ejemplo, una previsión meteorológica en España no responde a una pregunta sobre la previsión de París.
+- FECHA_DE_EMISIÓN solo sirve para resolver referencias temporales relativas; no sustituye una ubicación, entidad, año o dato específico ausente del contexto.
 - Rechaza si el contexto no aporta una respuesta material, si solo hay una coincidencia superficial, si necesitarías conocimiento externo, si exigiría un cálculo no respaldado, o si falta el dato exacto solicitado.
 - Si has_direct_evidence es false, relevant_chunk_ids debe ser una lista vacía.
 - Incluye únicamente IDs presentes en el contexto y necesarios para sostener la decisión.
