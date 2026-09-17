@@ -24,7 +24,6 @@ def main():
         score.update({'question':case['question'],'candidate_chunk_ids':[item.get('chunk_id') for item in results],'verifier':decision,'verification_ms':verification_ms})
         scored.append(score)
     report={'generated_at':datetime.now(timezone.utc).isoformat(),'input':args.input,'top_k':args.top_k,'min_score':args.min_score,'verifier_model':settings.ollama_chat_model,**summarize(scored)}
-    Path(args.output).write_text(json.dumps(report,ensure_ascii=False,indent=2)+'
-',encoding='utf-8')
+    Path(args.output).write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\n",encoding='utf-8')
     print(json.dumps({key:report[key] for key in ('evaluated_cases','positive_cases','negative_cases','recall_at_k','mrr','negative_accuracy','total_accuracy')},ensure_ascii=False))
 if __name__=='__main__': main()
