@@ -20,3 +20,5 @@ mlflow.db
 qdrant_storage/
 *.log
 .DS_Store
+data/*
+eval/*

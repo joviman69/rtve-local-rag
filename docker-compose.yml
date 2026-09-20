@@ -23,6 +23,9 @@ services:
       - "8000:8000"
     depends_on:
       - qdrant
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   qdrant_storage:
+  
