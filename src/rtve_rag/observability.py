@@ -15,7 +15,10 @@ class LangSmithTracer:
         self.settings = settings
         self.request_id = request_id
         self.root = None
-        self.enabled = bool(settings.langsmith_tracing and settings.langsmith_api_key)
+        self.enabled = bool(
+            getattr(settings, "langsmith_tracing", False)
+            and getattr(settings, "langsmith_api_key", "")
+        )
         self._run_tree = None
         if self.enabled:
             try:
