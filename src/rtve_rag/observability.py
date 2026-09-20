@@ -37,24 +37,35 @@ class LangSmithTracer:
         try:
             self.root = self._run_tree(name=name, run_type="chain", inputs=inputs, project_name=self.settings.langsmith_project, extra=self._extra())
             self.root.post()
-            yield state
-            self.root.end(outputs=state.get("outputs", {}))
-            self.root.patch()
         except Exception as error:
+            self.root = None
             log_event("langsmith_trace_failed", request_id=self.request_id, error_type=type(error).__name__)
+        try:
+            yield state
+        finally:
+            if self.root is not None:
+                try:
+                    self.root.end(outputs=state.get("outputs", {}))
+                    self.root.patch()
+                except Exception as error:
+                    log_event("langsmith_trace_close_failed", request_id=self.request_id, error_type=type(error).__name__)
 
     @contextmanager
     def span(self, name: str, inputs: dict, run_type: str = "chain"):
         state: dict = {}
-        if not self.enabled or self.root is None:
-            yield state
-            return
+        run = None
+        if self.enabled and self.root is not None:
+            try:
+                run = self.root.create_child(name=name, run_type=run_type, inputs=inputs)
+                run.post()
+            except Exception as error:
+                log_event("langsmith_span_failed", request_id=self.request_id, span=name, error_type=type(error).__name__)
         try:
-            run = self.root.create_child(name=name, run_type=run_type, inputs=inputs)
-            run.post()
             yield state
-            run.end(outputs=state.get("outputs", {}))
-            run.patch()
-        except Exception as error:
-            log_event("langsmith_span_failed", request_id=self.request_id, span=name, error_type=type(error).__name__)
-            yield state
+        finally:
+            if run is not None:
+                try:
+                    run.end(outputs=state.get("outputs", {}))
+                    run.patch()
+                except Exception as error:
+                    log_event("langsmith_span_close_failed", request_id=self.request_id, span=name, error_type=type(error).__name__)
