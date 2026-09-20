@@ -1,5 +1,4 @@
 from functools import lru_cache
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +17,10 @@ class Settings(BaseSettings):
     langsmith_tracing: bool = False
     langsmith_api_key: str = ""
     langsmith_project: str = "rtve-rag-local-dev"
+    langsmith_endpoint: str = "https://api.smith.langchain.com"
+    langsmith_environment: str = "development"
+    langsmith_content_mode: str = "full"
+    langsmith_sample_rate: float = 1.0
     log_level: str = "INFO"
 
 
